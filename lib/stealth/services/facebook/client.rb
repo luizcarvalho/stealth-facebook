@@ -30,7 +30,7 @@ module Stealth
 
         def self.fetch_profile(recipient_id:, fields: nil)
           if fields.blank?
-            fields = [:first_name, :last_name, :profile_pic, :locale, :timezone, :gender, :is_payment_enabled, :last_ad_referral]
+            fields = [:id, :name, :first_name, :last_name, :profile_pic]
           end
 
           query_hash = {
@@ -40,12 +40,45 @@ module Stealth
 
           uri = URI::HTTPS.build(
             host: "graph.facebook.com",
-            path: "/v2.12/#{recipient_id}",
+            path: "/#{recipient_id}",
             query: query_hash.to_query
           )
 
           response = Faraday.get(uri.to_s)
           Stealth::Logger.l(topic: "facebook", message: "Requested user profile for #{recipient_id}. Response: #{response.status}: #{response.body}")
+
+          if response.status.in?(200..299)
+            MultiJson.load(response.body)
+          else
+            raise(Stealth::Errors::ServiceError, "Facebook error #{response.status}: #{response.body}")
+          end
+        end
+
+        def self.track(recipient_id:, metric:, value:, options: {})
+          metric_values = [{
+            '_eventName' => metric,
+            '_valueToSum' => value
+          }]
+
+          metric_values.first.merge!(options)
+
+          params = {
+            event: 'CUSTOM_APP_EVENTS',
+            custom_events: MultiJson.dump(metric_values),
+            advertiser_tracking_enabled: 1,
+            application_tracking_enabled: 1,
+            extinfo: MultiJson.dump(['mb1']),
+            page_scoped_user_id: recipient_id,
+            page_id: Stealth.config.facebook.page_id
+          }
+
+          uri = URI::HTTPS.build(
+            host: "graph.facebook.com",
+            path: "/#{Stealth.config.facebook.app_id}/activities"
+          )
+
+          response = Faraday.post(uri.to_s, params)
+          Stealth::Logger.l(topic: "facebook", message: "Sending custom event for metric: #{metric} and value: #{value}. Response: #{response.status}: #{response.body}")
 
           if response.status.in?(200..299)
             MultiJson.load(response.body)

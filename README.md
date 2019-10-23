@@ -2,6 +2,8 @@
 
 This integration adds support for Facebook bots within [Stealth](https://github.com/hellostealth/stealth).
 
+[![Gem Version](https://badge.fury.io/rb/stealth-facebook.svg)](https://badge.fury.io/rb/stealth-facebook)
+
 ## Configure Your Facebook Page
 
 To create your Facebook bot, visit the [Facebook Developers](https://developers.facebook.com) page. Full instructions are provided on the [Facebook Messenger Docs](https://developers.facebook.com/docs/messenger-platform/) page.
@@ -10,7 +12,18 @@ When configuring your webhooks, you'll want to enable the `messages`, `messaging
 
 <img src='fb-config.png' width='875px' alt='Facebook Config Screenshot' />
 
-Make sure you don't enable `message_reads` as that is not yet supported by this gem.
+### message_reads
+
+Beginning with version `0.13.0` of this gem, `message_reads` webhooks are supported. When enabled in your Facebook configuration, they will appear as `current_message.read`. That will return a hash:
+
+```ruby
+{
+  watermark: 1458668856253,
+  seq: 38
+}
+```
+
+More info about `message_reads` webhooks can be found in the [Facebook Developer docs](https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/message-reads).
 
 ## Configure The Integration
 
@@ -93,6 +106,69 @@ Each time you make a change to the persistent menu, you will have to upload the 
 stealth setup facebook
 ```
 
+### Profile Data
+
+By default, your Facebook bots may retrieve the `id`, `name`, `first_name`, `last_name`, and `profile_pic` fields for users that have made this information public and have opted-in to your bot. More info [here](https://developers.facebook.com/docs/messenger-platform/identity/user-profile).
+
+To fetch a user's profile with `stealth-facebook` you can call the following:
+
+```ruby
+fb_profile = Stealth::Services::Facebook::Client.fetch_profile(
+  recipient_id: current_user_id
+)
+```
+
+`fb_profile` is a hash that contains the fields above:
+
+```ruby
+{
+  'id'            => 1464633220279330,
+  'name'          => "Carol Robbins",
+  'first_name'    => "Carol",
+  'last_name'     => "Robbins",
+  'profile_pic'   => "https://platform-lookaside.fbsbx.com/platform/profilepic/?psid=1464633220279330&width=1024&ext=1537650777&hash=AeQzWeTgFqlAyiye"
+}
+```
+
+If your bot has permission to retrieve additional fields, you can specify them as an array of symbols via the `fields` argument:
+
+```ruby
+fb_profile = Stealth::Services::Facebook::Client.fetch_profile(
+  recipient_id: current_user_id,
+  fields: [:id, :name, :first_name, :last_name, :profile_pic, :gender, :locale]
+)
+```
+
+### Analytics
+
+If you'd like to track custom bot metrics in addition to the ones provided automatically by Facebook Analytics, you can do so starting with version `0.12.0` of this gem.
+
+In order to send these metrics, you'll need to include the `app_id` of the bot as well as the `page_id` of the Facebook page (attached to the bot) to `services.yml`:
+
+```yaml
+default: &default
+  facebook:
+    verify_token: <%= ENV['FACEBOOK_VERIFY_TOKEN'] %>
+    page_access_token: <%= ENV['FACEBOOK_ACCESS_TOKEN'] %>
+    app_id: <%= ENV['FACEBOOK_APP_ID'] %>
+    page_id: <%= ENV['FACEBOOK_PAGE_ID'] %>
+    ...
+```
+
+Then to collect a metric:
+
+```ruby
+Stealth::Services::Facebook::Client.track(recipient_id: u.recipient_id, metric: 'name of your metric', value: 2)
+```
+
+You can specify additional options:
+
+```ruby
+Stealth::Services::Facebook::Client.track(recipient_id: u.recipient_id, metric: 'signup', value: 2, options: { 'fb_description' => 'A signup occured.' })
+```
+
+More info about events, such as which options are available, can be found on [Facebook's Events API docs](https://developers.facebook.com/docs/marketing-api/app-event-api) page.
+
 ## Replies
 
 Here are the supported replies for the Facebook integration:
@@ -103,14 +179,14 @@ These are standard text replies. It can sent like:
 
 ```yaml
 - reply_type: text
-  text: Hello World!
+  text: "Hello World!"
 ```
 
 Text replies can also include suggestions, which will be rendered as quick replies:
 
 ```yaml
 - reply_type: text
-  text: What is your favorite color?
+  text: "What is your favorite color?"
   suggestions:
     - text: Blue
     - text: Red
@@ -120,7 +196,7 @@ Although not as common, text replies can also include buttons:
 
 ```yaml
 - reply_type: text
-  text: Would you like to give us a call?
+  text: "Would you like to give us a call?"
   buttons:
     - type: call
       phone_number: "+15552991212"
@@ -204,7 +280,7 @@ This is the most common button type. When a user presses a button that is `paylo
 
 ```yaml
 - reply_type: text
-  text: Please press the button below
+  text: "Please press the button below"
   buttons:
     - type: payload
       text: 'Press me!'
@@ -220,17 +296,21 @@ The `url` button is useful when sharing a link to a website. By default, it will
 
 ```yaml
 - reply_type: text
-  text: Find out more via our website
+  text: "Find out more via our website"
   buttons:
     - type: url
       text: 'Visit website'
       url: 'https://example.org'
+      messenger_extensions: true
 
 ```
+
+Enabling messenger_extensions allows your webview to access a selection of features from the Messenger platform. More info [here](https://developers.facebook.com/docs/messenger-platform/webview/extensions?source=post_page). Without this parameter set to true, the webview opens in a separate tab or window if a user is visiting from the 'messenger.com' domain.
 
 You can also specify the height of the webview window that opens up in Messenger via: `webview_height`. You can choose between `compact`, `tall`, and `full`.
 
 More info [here](https://developers.facebook.com/docs/messenger-platform/webview).
+
 
 #### call
 
@@ -238,7 +318,7 @@ The `call` button type will prompt the user to dial the specified number. The nu
 
 ```yaml
 - reply_type: text
-  text: Give us a ring!
+  text: "Give us a ring!"
   buttons:
     - type: call
       text: 'Call'
@@ -296,12 +376,12 @@ To generate a list via Stealth Facebook:
   top_element_style: large
   buttons:
     - type: payload
-      title: View More
+      text: View More
       payload: view_more
   elements:
     - title: Your Daily News Update
       subtitle: The following stories have been curated just for you.
-      image_url: "https://news-articles.com/logo.png"
+      image_url: "https://loremflickr.com/320/240"
       buttons:
         - type: url
           url: "https://news-articles.com/199"
@@ -309,7 +389,7 @@ To generate a list via Stealth Facebook:
           webview_height: 'tall'
     - title: Breakthrough in AI
       subtitle: Major breakthrough in the AI space.
-      image_url: "https://news-articles.com/ai.png"
+      image_url: "https://loremflickr.com/320/320"
       default_action:
         - url: "https://news-articles.com/232"
           webview_height: 'tall'
@@ -372,3 +452,35 @@ To send an audio clip:
 The `audio_url` should be set to URL where the video has been uploaded.
 
 Audio replies support buttons and suggestions like text replies.
+
+### Account Linking
+
+Account Linking allows you to invite users to log-in using your own authentication flow, and to receive a Messenger page-scoped ID (PSID) upon completion. You can find more info about Facebook Account Linking [here](https://developers.facebook.com/docs/messenger-platform/identity/account-linking).
+
+#### Login
+
+The `login` button type will prompt the user to log-in using your own authentication flow in the case he or she has an account with your business. You can find more info about Facebook Log In Button [here](https://developers.facebook.com/docs/messenger-platform/reference/buttons/login).
+
+To create a `login` button:
+
+```yaml
+- reply_type: text
+  text: "Log in to access your account information."
+  buttons:
+    - type: login
+      url: "https://my-app.com/login"
+```
+
+#### Logout
+
+The `logout` button type is used in the account linking flow to unlink the message recipient's identity on Messenger with their account on your site. You can find more info about Facebook Log Out Button [here](https://developers.facebook.com/docs/messenger-platform/reference/buttons/logout).
+
+To create a `logout` button:
+
+```yaml
+- reply_type: text
+  text: "Log out"
+  buttons:
+    - type: logout
+```
+
