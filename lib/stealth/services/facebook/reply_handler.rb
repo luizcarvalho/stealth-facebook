@@ -141,7 +141,10 @@ module Stealth
           template
         end
 
+        # deprecated
         def list
+          Stealth::Logger.l(topic: 'facebook', message: 'WARNING: List template is deprecated!')
+
           template = list_template(
             top_element_style: reply["top_element_style"]
           )
