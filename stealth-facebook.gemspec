@@ -15,13 +15,9 @@ Gem::Specification.new do |s|
   s.add_dependency 'faraday', '~> 0.13'
   s.add_dependency 'stealth', '< 2.0'
 
-  s.add_development_dependency 'rack-test', '~> 0.7'
+  s.add_development_dependency 'rack-test', '~> 1.1'
   s.add_development_dependency 'rspec', '~> 3.6'
   s.add_development_dependency 'rspec_junit_formatter', '~> 0.3'
-<<<<<<< HEAD
-=======
-  s.add_development_dependency 'rack-test', '~> 1.1'
->>>>>>> e429808bda9134be62f862d02f181db0a02ac553
 
   s.files         = `git ls-files`.split("\n")
   s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
