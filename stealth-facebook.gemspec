@@ -13,7 +13,7 @@ Gem::Specification.new do |s|
   s.email = 'mauricio@edge14.com'
 
   s.add_dependency 'faraday', '~> 0.13'
-  s.add_dependency 'stealth', '< 2.0'
+  s.add_dependency 'stealth', '<= 2.0'
 
   s.add_development_dependency 'rack-test', '~> 1.1'
   s.add_development_dependency 'rspec', '~> 3.6'
